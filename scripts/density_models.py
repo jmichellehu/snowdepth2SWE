@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 
 # Bulk density model based on climate classes of seasonal snow
@@ -9,15 +10,21 @@ import numpy as np
 # k2 is the densification parameter for DOY
 
 def get_doy(f, handleleaps=True):
-    '''Calculates day of year from string input of format "YYYYMMDD" and has built-in leapyear handling'''
+    """Calculates day of year from string input of format "YYYYMMDD" and has built-in leapyear handling
+    Args:
+        arg1
+    
+    Returns:
+        Thing(s) that is/are returned.
+    """
     
     import datetime
-    Y=int(f[:4])
-    M=int(f[4:6])
-    D=int(f[-2:])
+    Y = int(f[:4])
+    M = int(f[4:6])
+    D = int(f[-2:])
     
-    thisDate=datetime.date(Y, M, D)
-    yearEnd=datetime.date(Y,12,31)
+    thisDate = datetime.date(Y, M, D)
+    yearEnd = datetime.date(Y,12,31)
     diff = (yearEnd-thisDate).days
 
     # Calculate day of water year using this difference and numpy array functions
@@ -25,8 +32,8 @@ def get_doy(f, handleleaps=True):
 
     # Leap year handling
     if handleleaps:
-        if (thisDate>datetime.date(Y, 2, 28)) & (thisDate <=yearEnd) & (Y%4) == 0:
-            DOY=DOY+1
+        if (thisDate>datetime.date(Y, 2, 28)) & (thisDate <= yearEnd) & (Y%4) == 0:
+            DOY = DOY+1
 
     return DOY
 
@@ -35,36 +42,51 @@ def extract_byclass(c, snow_classes=("Alpine", "Maritime", "Prairie", "Tundra", 
                     rho_inits = (0.2237, 0.2578, 0.2332, 0.2425, 0.2170),
                     k1s = (0.0012, 0.0010, 0.0016, 0.0029, 0.0000),
                     k2s = (0.0038, 0.0038, 0.0031, 0.0049, 0.0000)):
-    '''
-    Selects appropriate parameters based on string input snow climate class
-    Returns snow_class, rho_max, rho_init, k1, and k2
-    '''
+    
+    """Selects appropriate parameters based on string input snow climate class
+    Args:
+        arg1
+    
+    Returns:
+        snow_class, rho_max, rho_init, k1, and k2
+    """
     
     import sys
     
     if c in snow_classes:
-        idx=snow_classes.index(c)
+        idx = snow_classes.index(c)
     elif c.title() in snow_classes:
-        idx=snow_classes.index(c.title())
+        idx = snow_classes.index(c.title())
     else:
         sys.exit(f'Neither {c}, nor {c.title()} in {snow_classes}')
         
     return snow_classes[idx], rho_maxes[idx], rho_inits[idx], k1s[idx], k2s[idx]
 
 def sturm_swecalc(h, snow_class, DOY=None, YMD=None, return_all=None):
-    '''Uses Sturm snow climate classes to derive SWE estimates, note input snow depth MUST be converted to centimeters. Please input meters. Returned swe will be in centimeters'''
+    """Uses Sturm snow climate classes to derive SWE estimates, note input snow depth MUST be converted to centimeters. 
+    Args:
+        arg1
+        Please input meters. 
+    
+    Returns:
+        Thing(s) that is/are returned.
+        Returned swe will be in centimeters
+    """
     import numpy as np
     if DOY is None:
-        DOY=get_doy(YMD)
+        DOY = get_doy(YMD)
     
     returnedsnow_class, rho_max, rho_init, k1, k2=extract_byclass(c=snow_class)
     
-    h_cm=h*10 # convert from meters to centimeters 
+    h_cm = h*10 # convert from meters to centimeters 
     rho_b_model = (rho_max - rho_init) * (1-np.exp(-k1 * h_cm - k2 * DOY)) + rho_init
     
     # Convert to millimeters of SWE
-    swe=np.multiply(rho_b_model, h) * 1000
-    print(f'Mean Sturm SWE using sturm bulk density of {np.nanmean(rho_b_model.values):.2f} gcm-3 is {np.mean(swe).values:.2f} mm ')
+    swe = np.multiply(rho_b_model, h) * 1000
+    if type(swe) == np.ma.core.MaskedArray:
+        print(f'Mean Sturm SWE using sturm bulk density of {np.nanmean(rho_b_model):.2f} gcm-3 is {np.nanmean(swe):.2f} mm ')
+    else:
+        print(f'Mean Sturm SWE using sturm bulk density of {np.nanmean(rho_b_model.values):.2f} gcm-3 is {np.nanmean(swe.values):.2f} mm ')
     if return_all:
         return swe, rho_b_model, returnedsnow_class, rho_max, rho_init, k1, k2, DOY  
     else:
@@ -72,15 +94,33 @@ def sturm_swecalc(h, snow_class, DOY=None, YMD=None, return_all=None):
 
 def bulkdensity_swecalc(h, bulk_density):
     import numpy as np
-    '''Basic SWE calculation using snow depth and input bulk density, depth in meters and bulk_density in kg/m^3''' 
+    """Basic SWE calculation using snow depth and input bulk density, depth in meters and bulk_density in kg/m^3"""
+    """Docstring short description
+    
+    Args:
+        arg1
+    
+    Returns:
+        Thing(s) that is/are returned.
+    Need better handling for input array type MaskedArray or DataArray
+    """
     swe = h * bulk_density
-    print(f"SWE from basic calculations using bulk density of {bulk_density} gcm-3 is {np.mean(swe).values:.2f} meters")
+    if type(swe) == np.ma.core.MaskedArray:
+        print(f"SWE from basic calculations using bulk density of {bulk_density} gcm-3 is {np.nanmean(swe):.2f} meters")
+    else:
+        print(f"SWE from basic calculations using bulk density of {bulk_density} gcm-3 is {np.nanmean(swe.values):.2f} meters")
     return swe
 
-
-
-
 def get_sturm_density():
+    """Docstring short description
+    
+    Args:
+        arg1
+    
+    Returns:
+        Thing(s) that is/are returned.
+    """
+
     snow_classes = ["Alpine", "Maritime", "Prairie", "Tundra", "Taiga"]
     rho_maxes = [0.5975, 0.5979, 0.5940, 0.3630, 0.2170]
     rho_inits = [0.2237, 0.2578, 0.2332, 0.2425, 0.2170]

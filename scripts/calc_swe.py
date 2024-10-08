@@ -1,12 +1,22 @@
 #!/usr/bin/env python
 
+'''Calculates snow water equivalent (SWE) estimate(s) given the observed day, month, year, lat, lon, and snow depth inputs as outlined in: Converting snow depth to snow water equivalent using climatological variables (D.F. Hill et al., 2019).
+Official corresponding MATLAB and python scripts are housed in the Community Snow Observations repository (https://github.com/communitysnowobs/snowdensity). 
+Differences in SWE estimates between this script and the original MATLAB script are on the order of 1e-05 mm.
+Note: Includes array handling and "options" for interpolation. DOY is noted as DOWY (day of water year) and is calculated from input date.
+'''
+
 import numpy as np
+import rioxarray
+import xarray as xr
+from rasterio.enums import Resampling
+
 
 def grid_climate(ref, td_fn='TD.tif', pptwt_fn='PPTWT.tif'):
-    '''Resamples, reprojects and clips extent of specified climate grids according to input reference raster.
+    """Resamples, reprojects and clips extent of specified climate grids according to input reference raster.
         Input:
             ref: reference raster (e.g., snow depth)
-            td_fn: temperature difference grid filename
+            td_fn: temperature difference grid filename 
             pptwt_fn: winter precipitation grid filename
     
         Returns:
@@ -19,11 +29,16 @@ def grid_climate(ref, td_fn='TD.tif', pptwt_fn='PPTWT.tif'):
             TD_PPTWT_merge_proj [degrees C and mm]
                 stack of regridded (projection, extent, resolution) temperature difference 
                 and winter precipitation grids over area of interest       
-    '''
-    import rioxarray
-    import xarray as xr
-    from rasterio.enums import Resampling
+        
+    """ 
+    """Docstring short description
     
+    Args:
+        arg1
+    
+    Returns:
+        Thing(s) that is/are returned.
+    """   
     TD_fromdisk = rioxarray.open_rasterio(td_fn,
                                           masked=True,
                                           default_name='TD').squeeze(dim='band',
@@ -47,11 +62,11 @@ def grid_climate(ref, td_fn='TD.tif', pptwt_fn='PPTWT.tif'):
     return td, pptwt, TD_PPTWT_merge_proj
 
 def get_snowdepth(ref_fn=None, arr=None, mm_convert=None):
-    '''Loads snow depth array as rioxarray dataarray and converts to millimeters if needed
+    """Loads snow depth array as rioxarray dataarray and converts to millimeters if needed
         Returns:
             h [mm]
                 snow depth dataarray
-    '''
+    """
     import rioxarray
     if ref_fn is not None:
         h = rioxarray.open_rasterio(ref_fn, masked=True, default_name='SD').squeeze(dim='band', drop=True)
@@ -65,12 +80,25 @@ def get_snowdepth(ref_fn=None, arr=None, mm_convert=None):
         return h
 
 def calc_dowy(f):
-    '''Calculates day of water year from string input of format "YYYYMMDD" .'''
+    """Calculates day of water year from string input of format [YYYYMMDD].
+
+    Args
+    Returns
+        day of water year (DOWY) as int
+    """
+    """Docstring short description
+    
+    Args:
+        arg1
+    
+    Returns:
+        Thing(s) that is/are returned.
+    """
     import datetime
     
-    Y=int(f[:4])
-    M=int(f[4:6])
-    D=int(f[-2:])
+    Y = int(f[:4])
+    M = int(f[4:6])
+    D = int(f[-2:])
 
     thisDate=datetime.date(Y, M, D)
     endDOWY=datetime.date(Y,9,30)
@@ -78,23 +106,23 @@ def calc_dowy(f):
 
     # adjust for negative values
     if diff < 0:
-        diff=diff+365
+        diff = diff+365
 
     # Calculate day of water year using this difference and numpy array functions
     DOWY = 365-diff
 
     # Comment out if you don't want leap year handling
-    if (thisDate>datetime.date(Y, 2, 28)) & (thisDate <=endDOWY) & (Y%4) == 0:
-        DOWY=DOWY+1
+    if (thisDate>datetime.date(Y, 2, 28)) & (thisDate <= endDOWY) & (Y%4) == 0:
+        DOWY = DOWY+1
 
     return DOWY
 
-def calc_swe(fn=None, h=None, YMD=None, mm_convert=None, 
+def calc_swe(fn = None, h = None, YMD = None, mm_convert = None, 
              td_fn='TD.tif', pptwt_fn='PPTWT.tif', 
              a = (0.0533,0.9480,0.1701,-0.1314,0.2922),
              b = (0.0481,1.0395,0.1699,-0.0461,0.1804)
             ):
-    '''Calculate SWE based on Hill et al. (2019) algorithm. Input snow depth raster filename or direct date input.
+    """Calculate SWE based on Hill et al. (2019) algorithm. Input snow depth raster filename or direct date input.
         Depth raster should be in [mm].
         
         Input
@@ -118,24 +146,25 @@ def calc_swe(fn=None, h=None, YMD=None, mm_convert=None,
             
             DOWY
                 day of water year (e.g. Oct. 1 ==> DOWY = 1)
-    '''
-    print("\nCalculating SWE...")
+    """
+
+    # print("\nCalculating SWE...")
     if h is None:
-        h=get_snowdepth(fn, mm_convert=mm_convert)
+        h = get_snowdepth(fn, mm_convert = mm_convert)
         
     td, pptwt, TD_PPTWT_merge_proj=grid_climate(h, td_fn, pptwt_fn)
     
     if YMD is not None:
-        DOWY=calc_dowy(YMD)
+        DOWY = calc_dowy(YMD)
     else:
         try: 
-            DOWY=calc_dowy(fn.split("-")[1])
+            DOWY = calc_dowy(fn.split("-")[1])
         except:
             print("Cannot find date in filename and no input date detected")
             exit(1)
 
-    swe_calc = a[0]* h**a[1] * pptwt**a[2] * td**a[3] * DOWY**a[4]\
-                * (-np.tanh(0.01*(DOWY-180))+1)/2 + b[0] * h**b[1] * pptwt**b[2]\
+    swe_calc = a[0]* h**a[1] * pptwt**a[2] * td**a[3] * DOWY**a[4] * (-np.tanh(0.01*(DOWY-180))+1)/2 \
+                    + b[0] * h**b[1] * pptwt**b[2]\
                 * td**b[3] * DOWY**b[4] * (np.tanh(0.01 * (DOWY-180))+1)/2
     
     swe=h.copy()
@@ -144,19 +173,6 @@ def calc_swe(fn=None, h=None, YMD=None, mm_convert=None,
     swe.attrs['default_name'] = 'SWE'
     swe.attrs['long_name'] = 'snow water equivalent [mm]'
     
-    print(f"Mean Hill SWE is {np.mean(swe).values:.2f} millimeters")
+    print(f"Mean Hill SWE is {np.nanmean(swe.values):.2f} millimeters")
     
     return swe, h, TD_PPTWT_merge_proj, DOWY
-
-def write_SWE(in_fn, out_fn=None, YMD=None, mm_convert=None):
-    '''Calculate SWE and write to file'''
-
-#     swe, h, TD_PPTWT_merge_proj, DOWY = calc_swe(fn=in_fn, YMD=YMD)
-    swe, _, _, DOWY = calc_swe(fn=in_fn, YMD=YMD, mm_convert=mm_convert)
-
-    # Write it out
-    print("\nWriting to file...")
-    if out_fn is None:
-        out_fn = "swe_DOWY" + str(DOWY) + ".tif"
-    swe.rio.to_raster(out_fn, **kwargs)
-    
